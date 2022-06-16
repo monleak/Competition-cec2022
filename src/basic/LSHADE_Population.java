@@ -216,99 +216,6 @@ public class LSHADE_Population {
         mv.clear();
         NI=0;
     }
-    public void updatePop1() {
-        //Không giảm quy mô quần thể
-        gen++;
-
-        // update F, CR memory
-        if (s_cr.size() > 0) {
-            mem_cr[mem_pos] = 0;
-            mem_f[mem_pos] = 0;
-            double temp_sum_cr = 0;
-            double temp_sum_f = 0;
-            double sum_diff = 0;
-
-            for (double d : diff_f) {
-                sum_diff += d;
-            }
-
-            for (int i = 0; i < s_cr.size(); i++) {
-                double weight = diff_f.get(i) / sum_diff;
-
-                mem_f[mem_pos] += weight * s_f.get(i) * s_f.get(i);
-                temp_sum_f += weight * s_f.get(i);
-
-                mem_cr[mem_pos] += weight * s_cr.get(i) * s_cr.get(i);
-                temp_sum_cr += weight * s_cr.get(i);
-            }
-
-            mem_f[mem_pos] /= temp_sum_f;
-
-            if (temp_sum_cr == 0 || mem_cr[mem_pos] == -1)
-                mem_cr[mem_pos] = -1;
-            else
-                mem_cr[mem_pos] /= temp_sum_cr;
-
-            mem_pos++;
-            if (mem_pos >= Params.H) {
-                mem_pos = 0;
-            }
-
-            s_cr.clear();
-            s_f.clear();
-            diff_f.clear();
-        }
-
-
-        sortPop();
-        if (best == null || best.getFitness() > this.individuals.get(0).getFitness()) {
-            best = this.individuals.get(0);
-        }
-
-        // update pbest list
-        top.clear();
-        int pbest_size = (int) (Params.BEST_RATE * this.individuals.size());
-        pbest_size = Math.max(pbest_size,2); //tối thiểu phải bằng 2
-        for (int i = 0; i < pbest_size; i++) {
-            //Chứa n cá thể tốt nhất của quần thể
-            top.add(this.individuals.get(i));
-        }
-
-        // update RMP
-        best_partner = -1;
-        double maxRmp = 0;
-        for (int i = 0; i < problem.TASKS_NUM; i++) {
-            if (i != this.task_index) {
-                double good_mean = 0;
-                if (s_rmp[i].size() > 0) {
-                    double sum = 0;
-                    for (double d : diff_f_inter_x[i]) {
-                        sum += d;
-                    }
-
-                    double val1 = 0, val2 = 0, w;
-                    for (int k = 0; k < s_rmp[i].size(); k++) {
-                        w = diff_f_inter_x[i].get(k) / sum;
-                        val1 += w * s_rmp[i].get(k) * s_rmp[i].get(k);
-                        val2 += w * s_rmp[i].get(k);
-                    }
-                    good_mean = val1 / val2;
-
-                    if (good_mean > rmp[i] && good_mean > maxRmp) {
-                        maxRmp = good_mean;
-                        best_partner = i;
-                    }
-                }
-
-                double c1 = s_rmp[i].size() > 0 ? 1.0 : 1.0 - Params.C;
-                rmp[i] = c1 * rmp[i] + Params.C * good_mean;
-                rmp[i] = Math.max(0.01, Math.min(1, rmp[i]));
-
-                s_rmp[i].clear();
-                diff_f_inter_x[i].clear();
-            }
-        }
-    }
 
     public Individual operateCurrentToPBest1BinWithArchive(Individual current) {
         Individual r1, r2, pbest;
@@ -333,6 +240,10 @@ public class LSHADE_Population {
         } while (f <= 0);
         if (f > 1)
             f = 1;
+
+        if(Params.countEvals < Params.maxEvals * 0.5){
+            f = 0.45 + 0.1*Params.rand.nextDouble();
+        }
 
         int dem=0; // Biến đếm số lần chọn (Để tránh trường hợp lặp vô hạn)
         do {
@@ -489,6 +400,102 @@ public class LSHADE_Population {
                 archive.remove(Params.rand.nextInt(archive.size()));
                 archive.add(current);
             }
+            return child;
+        } else {
+            return current;
+        }
+    }
+
+    public Individual operateBest1WithPop1(Individual current, ArrayList<Individual> Pop1) {
+        Individual r1, r2, pbest;
+
+        int rand_pos = Params.rand.nextInt(Params.H);
+        double mu_cr = mem_cr[rand_pos];
+        double mu_f = mem_f[rand_pos];
+        double cr, f;
+
+        if (mu_cr == -1) {
+            cr = 0;
+        } else {
+            cr = Utils.gauss(mu_cr, 0.1);
+            if (cr > 1)
+                cr = 1;
+            else if (cr < 0)
+                cr = 0;
+        }
+
+        do {
+            f = Utils.cauchy_g(mu_f, 0.1);
+        } while (f <= 0);
+        if (f > 1)
+            f = 1;
+
+        int dem=0; // Biến đếm số lần chọn (Để tránh trường hợp lặp vô hạn)
+        do {
+            if(dem<10){
+                pbest = top.get(RWS.runRWS(top));
+                dem++;
+            }else pbest = top.get(Params.rand.nextInt(top.size()));
+        } while (pbest.getID() == current.getID());
+        dem=0;
+        do {
+            if(dem<10){
+                r1 = individuals.get(RWS.runRWS(individuals));
+                dem++;
+            }else r1 = individuals.get(Params.rand.nextInt(individuals.size()));
+        } while (r1.getID() == current.getID() || r1.getID() == pbest.getID());
+
+        r2 = Pop1.get(Params.rand.nextInt(Pop1.size()));
+
+        int j_rand = Params.rand.nextInt(problem.DIM);
+        Individual child = new Individual(problem.DIM);
+        for (int j = 0; j < problem.DIM; j++) {
+            if (Params.rand.nextDouble() <= cr || j == j_rand) {
+                child.setGene(j, pbest.getGene(j)
+                        + f * (r1.getGene(j) - r2.getGene(j) + PWI[j]));
+
+                // bound handling
+                if (child.getGene(j) > 1) {
+                    child.setGene(j, (current.getGene(j) + 1) / 2.0);
+                } else if (child.getGene(j) < 0) {
+                    child.setGene(j, (current.getGene(j) + 0) / 2.0);
+                }
+            } else {
+                child.setGene(j, current.getGene(j));
+            }
+        }
+
+        child.setFitness(problem.getTask(task_index).calculateFitnessValue(child.getChromosome()));
+        count_evals++;
+        if (child.getFitness() == current.getFitness()) {
+
+            Double[] Temp_mv = new Double[child.getChromosome().length];
+            for(int i=0;i<child.getChromosome().length;i++){
+                Temp_mv[i] = child.getGene(i) - current.getGene(i);
+            }
+            mv.add(Temp_mv);
+            NI++;
+
+            return child;
+        } else if (child.getFitness() < current.getFitness()) {
+            s_cr.add(cr);
+            s_f.add(f);
+            diff_f.add(current.getFitness() - child.getFitness());
+
+            if (archive.size() < Params.ARC_RATE * this.individuals.size()) {
+                archive.add(current);
+            } else {
+                archive.remove(Params.rand.nextInt(archive.size()));
+                archive.add(current);
+            }
+
+            Double[] Temp_mv = new Double[child.getChromosome().length];
+            for(int i=0;i<child.getChromosome().length;i++){
+                Temp_mv[i] = child.getGene(i) - current.getGene(i);
+            }
+            mv.add(Temp_mv);
+            NI++;
+
             return child;
         } else {
             return current;

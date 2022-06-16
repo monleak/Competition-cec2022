@@ -203,6 +203,12 @@ public class MLSHADE_LS {
     }
 
     public double[] run3(double[][] mem_f){
+        /*Chạy 2 quần thể riêng biệt
+            Pop - quần thể chính
+            pop1 - quần thẻ phụ
+         nửa số lượng đánh giá đầu tiên chạy pop1
+         nửa số lượng đánh giá sau đó chạy pop, sau mỗi 20 thế hệ chuyển 1 lượng cá thể từ pop1 qua pop
+         */
         Params.countEvals = 0;
         Params.maxEvals = prob.TASKS_NUM * Params.MAX_EVALS_PER_TASK;
         double[] result = new double[prob.TASKS_NUM];
@@ -215,7 +221,7 @@ public class MLSHADE_LS {
 //            pop.get(i).randomInit(Params.MAX_POP_SIZE);
 //            pop.get(i).update();
             pop1.get(i).randomInit(Params.MAX_POP_SIZE);
-            pop1.get(i).updatePop1();
+            pop1.get(i).update();
         }
 
         if (Params.countEvals >= (recordCounter + 1) * evalsPerRecord) {
@@ -229,7 +235,6 @@ public class MLSHADE_LS {
         int gen = 0; //biến đếm thế hệ
         boolean stop = false;
         int[] initPop = new int[prob.TASKS_NUM];
-        double[] Fitness50TheHeTruoc = new double[prob.TASKS_NUM];
         while (Params.countEvals < Params.maxEvals && !stop) {
             stop = true;
             for (int i = 0; i < prob.TASKS_NUM; i++) {
@@ -249,7 +254,7 @@ public class MLSHADE_LS {
                     }
                     pop1.get(i).getIndividuals().clear();
                     pop1.get(i).getIndividuals().addAll(offspring);
-                    pop1.get(i).updatePop1();
+                    pop1.get(i).update();
                 }else{
                     if(initPop[i] == 0){
                         pop.get(i).getIndividuals().addAll(pop1.get(i).getIndividuals());
@@ -260,7 +265,7 @@ public class MLSHADE_LS {
                         int t = Params.rand.nextInt(prob.TASKS_NUM);
                         if (t == i) {
                             // lai ghép cùng tác vụ sử dụng LSHADE
-                            offspring.add(pop.get(i).operateCurrentToPBest1BinWithArchive(indiv));
+                            offspring.add(pop.get(i).operateBest1WithPop1(indiv,pop1.get(i).getIndividuals()));
                         } else {
                             double rmp;
                             if (pop.get(i).getBest_partner() == t) {
@@ -298,7 +303,7 @@ public class MLSHADE_LS {
                                 }
                             } else {
                                 // intra
-                                offspring.add(pop.get(i).operateCurrentToPBest1BinWithArchive(indiv));
+                                offspring.add(pop.get(i).operateBest1WithPop1(indiv,pop1.get(i).getIndividuals()));
                             }
                         }
                     }
@@ -307,10 +312,9 @@ public class MLSHADE_LS {
                     pop.get(i).getIndividuals().addAll(offspring);
                     // update RMP, F, CR, population size
                     pop.get(i).update();
-                    Fitness50TheHeTruoc[i] = pop.get(i).getBest().getFitness();
 
                     // local search on the best solution using DSCG method
-                    if (gen % 50 == 0  && (Fitness50TheHeTruoc[i] - pop.get(i).getBest().getFitness()) / Fitness50TheHeTruoc[i] < 0.125) {
+                    if (gen % 50 == 0) {
                         LocalSearch ls = new DSCG();
                         Individual neib = ls.search(pop.get(i).getIndividual(0), 2000, prob.getTask(i));
                         if (neib.getFitness() < pop.get(i).getIndividual(0).getFitness()) {
@@ -319,13 +323,12 @@ public class MLSHADE_LS {
                         }
                     }
 
-                    if (gen % 50 == 0 && (Fitness50TheHeTruoc[i] - pop.get(i).getBest().getFitness()) / Fitness50TheHeTruoc[i] < 0.125) {
-                        for (int k = 0; k < pop.get(i).getIndividuals().size()*Params.ARC_RATE; k++) {
-                            pop.get(i).getArchive().remove(Params.rand.nextInt(pop.get(i).getArchive().size()));
-                            pop.get(i).getArchive().add(pop1.get(i).getIndividuals().get(Params.rand.nextInt(pop1.get(i).getIndividuals().size())));
-                        }
-                        Fitness50TheHeTruoc[i] = pop.get(i).getBest().getFitness();
-                    }
+//                    if (gen % 20 == 0) {
+//                        for (int k = 0; k < pop.get(i).getIndividuals().size()*Params.ARC_RATE; k++) {
+//                            pop.get(i).getArchive().remove(Params.rand.nextInt(pop.get(i).getArchive().size()));
+//                            pop.get(i).getArchive().add(pop1.get(i).getIndividuals().get(Params.rand.nextInt(pop1.get(i).getIndividuals().size())));
+//                        }
+//                    }
                 }
 
 
@@ -353,6 +356,7 @@ public class MLSHADE_LS {
 
         return result;
     }
+
     private ArrayList<Individual> inter_crossover(Individual p1, Individual p2) {
         ArrayList<double[]> offspring_gene = SBX.generateOffspring(p1.getChromosome(), p2.getChromosome());
         for (int i=0;i< prob.DIM;i++){

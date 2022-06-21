@@ -15,6 +15,7 @@ public class RWS {
                 maxF = Individuals.get(i).getFitness();
             }
         }
+        maxF = maxF + maxF/Individuals.size();
         for (int i=0;i<Individuals.size();i++){
             F[i]=maxF-Individuals.get(i).getFitness();
             sumF+=F[i];

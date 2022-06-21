@@ -18,10 +18,10 @@ public class Params {
     public static final int MAX_EVALS_PER_TASK = 100000;
     public static final double EPSILON = 5e-7; //điểm tối ưu (coi như bằng 0)
 
-    public static final int H = 30; //Số phần tử của mem_cr, mem_f
+    public static final int H = 5; //Số phần tử của mem_cr, mem_f
     public static final double BEST_RATE = 0.11; //top.size() gấp bao nhiêu lần pop_size 0.11
     public static final double ARC_RATE = 5; //archive.size() gấp bao nhiêu lần pop_size 5
-    public static final int MIN_POP_SIZE = 4; //Số cá thể tối thiểu mỗi tác vụ
+    public static final int MIN_POP_SIZE = 5; //Số cá thể tối thiểu mỗi tác vụ
     public static final int MAX_POP_SIZE = 100; //Số cá thể tối đa của mỗi tác vụ
 
     public static final double C = 0.02; //Sử dụng để update Rmp

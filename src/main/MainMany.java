@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
+
 import basic.Params;
 import basic.ProblemManager;
 import benchmark.ProblemConstructor;
@@ -30,7 +31,7 @@ public class MainMany {
                 Params.rand = new Random(seed);
                 System.out.println("Program running with seed = " + seed);
                 MLSHADE_LS solver = new MLSHADE_LS(pm.getProblem(i));
-                double[] result = solver.run2(mem_f[seed]);
+                double[] result = solver.run3(mem_f[seed]);
 
                 for (int t = 0; t < taskNum; t++) {
                     mean[t] += result[t] / Params.REPT;

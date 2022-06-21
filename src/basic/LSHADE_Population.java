@@ -1,6 +1,7 @@
 package basic;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 
@@ -14,6 +15,7 @@ public class LSHADE_Population {
     private ArrayList<Individual> individuals; //Danh sách các cá thể
     private Individual best; //Cá thể tốt nhất trong quần thể
 
+    /******************** LSHADE *****************/
     private ArrayList<Individual> archive; //
     private ArrayList<Individual> top; //Chứa n cá thể tốt nhất của quần thể
 
@@ -40,8 +42,12 @@ public class LSHADE_Population {
     private ArrayList<Double>[] diff_f_inter_x; //Sử dụng để tính độ ảnh hưởng của index i đến việc cập nhật rmp[]
     private int best_partner;
     private int count_evals; //Số lượng đánh giá
+    /******************** LSHADE *****************/
 
-    public LSHADE_Population(Problem problem, int task_idx) {
+
+
+    public LSHADE_Population(Problem problem, int task_idx, boolean checkConsistency) {
+        /******************** LSHADE *****************/
         this.problem = problem;
         this.task_index = task_idx;
         this.individuals = new ArrayList<Individual>();
@@ -76,6 +82,8 @@ public class LSHADE_Population {
             diff_f_inter_x[i] = new ArrayList<Double>();
         }
         count_evals = 0;
+        /******************** LSHADE *****************/
+
     }
 
     public void randomInit(int size) {
@@ -204,14 +212,12 @@ public class LSHADE_Population {
         //update PWI
         if(NI > 0.1*individuals.size()){
             for (int i=0;i<PWI.length;i++){
-                for (int j=0;j<mv.size();j++){
-                    PWI[i]+=mv.get(j)[i]/NI;
+                for (Double[] doubles : mv) {
+                    PWI[i] += doubles[i] / NI;
                 }
             }
         }else {
-            for (int i=0;i<PWI.length;i++){
-                PWI[i]=0;
-            }
+            Arrays.fill(PWI, 0);
         }
         mv.clear();
         NI=0;
@@ -257,7 +263,9 @@ public class LSHADE_Population {
             if(dem<10){
                 r1 = individuals.get(RWS.runRWS(individuals));
                 dem++;
-            }else r1 = individuals.get(Params.rand.nextInt(individuals.size()));
+            }else {
+                r1 = individuals.get(Params.rand.nextInt(individuals.size()));
+            }
         } while (r1.getID() == current.getID() || r1.getID() == pbest.getID());
 
         dem = 0;
@@ -271,6 +279,15 @@ public class LSHADE_Population {
                 }else r2 = individuals.get(Params.rand.nextInt(individuals.size()));
             } while (r2.getID() == current.getID() || r2.getID() == r1.getID() || r2.getID() == pbest.getID());
         }
+//        ArrayList<Individual> ArchiveAndIndivs = new ArrayList<Individual>();
+//        ArchiveAndIndivs.addAll(individuals);
+//        ArchiveAndIndivs.addAll(archive);
+//        do {
+//            if(dem<10){
+//                r2 = ArchiveAndIndivs.get(RWS.runRWS(ArchiveAndIndivs));
+//                dem++;
+//            }else r2 = ArchiveAndIndivs.get(Params.rand.nextInt(ArchiveAndIndivs.size()));
+//        } while (r2.getID() == current.getID() || r2.getID() == r1.getID() || r2.getID() == pbest.getID());
 
         int j_rand = Params.rand.nextInt(problem.DIM);
         Individual child = new Individual(problem.DIM);
@@ -278,6 +295,8 @@ public class LSHADE_Population {
             if (Params.rand.nextDouble() <= cr || j == j_rand) {
                 child.setGene(j, current.getGene(j)
                         + f * (pbest.getGene(j) - current.getGene(j) + r1.getGene(j) - r2.getGene(j) + PWI[j]));
+//                child.setGene(j, current.getGene(j)
+//                        + f * (pbest.getGene(j) - current.getGene(j) + r1.getGene(j) - r2.getGene(j)));
 
                 // bound handling
                 if (child.getGene(j) > 1) {
@@ -400,102 +419,6 @@ public class LSHADE_Population {
                 archive.remove(Params.rand.nextInt(archive.size()));
                 archive.add(current);
             }
-            return child;
-        } else {
-            return current;
-        }
-    }
-
-    public Individual operateBest1WithPop1(Individual current, ArrayList<Individual> Pop1) {
-        Individual r1, r2, pbest;
-
-        int rand_pos = Params.rand.nextInt(Params.H);
-        double mu_cr = mem_cr[rand_pos];
-        double mu_f = mem_f[rand_pos];
-        double cr, f;
-
-        if (mu_cr == -1) {
-            cr = 0;
-        } else {
-            cr = Utils.gauss(mu_cr, 0.1);
-            if (cr > 1)
-                cr = 1;
-            else if (cr < 0)
-                cr = 0;
-        }
-
-        do {
-            f = Utils.cauchy_g(mu_f, 0.1);
-        } while (f <= 0);
-        if (f > 1)
-            f = 1;
-
-        int dem=0; // Biến đếm số lần chọn (Để tránh trường hợp lặp vô hạn)
-        do {
-            if(dem<10){
-                pbest = top.get(RWS.runRWS(top));
-                dem++;
-            }else pbest = top.get(Params.rand.nextInt(top.size()));
-        } while (pbest.getID() == current.getID());
-        dem=0;
-        do {
-            if(dem<10){
-                r1 = individuals.get(RWS.runRWS(individuals));
-                dem++;
-            }else r1 = individuals.get(Params.rand.nextInt(individuals.size()));
-        } while (r1.getID() == current.getID() || r1.getID() == pbest.getID());
-
-        r2 = Pop1.get(Params.rand.nextInt(Pop1.size()));
-
-        int j_rand = Params.rand.nextInt(problem.DIM);
-        Individual child = new Individual(problem.DIM);
-        for (int j = 0; j < problem.DIM; j++) {
-            if (Params.rand.nextDouble() <= cr || j == j_rand) {
-                child.setGene(j, pbest.getGene(j)
-                        + f * (r1.getGene(j) - r2.getGene(j) + PWI[j]));
-
-                // bound handling
-                if (child.getGene(j) > 1) {
-                    child.setGene(j, (current.getGene(j) + 1) / 2.0);
-                } else if (child.getGene(j) < 0) {
-                    child.setGene(j, (current.getGene(j) + 0) / 2.0);
-                }
-            } else {
-                child.setGene(j, current.getGene(j));
-            }
-        }
-
-        child.setFitness(problem.getTask(task_index).calculateFitnessValue(child.getChromosome()));
-        count_evals++;
-        if (child.getFitness() == current.getFitness()) {
-
-            Double[] Temp_mv = new Double[child.getChromosome().length];
-            for(int i=0;i<child.getChromosome().length;i++){
-                Temp_mv[i] = child.getGene(i) - current.getGene(i);
-            }
-            mv.add(Temp_mv);
-            NI++;
-
-            return child;
-        } else if (child.getFitness() < current.getFitness()) {
-            s_cr.add(cr);
-            s_f.add(f);
-            diff_f.add(current.getFitness() - child.getFitness());
-
-            if (archive.size() < Params.ARC_RATE * this.individuals.size()) {
-                archive.add(current);
-            } else {
-                archive.remove(Params.rand.nextInt(archive.size()));
-                archive.add(current);
-            }
-
-            Double[] Temp_mv = new Double[child.getChromosome().length];
-            for(int i=0;i<child.getChromosome().length;i++){
-                Temp_mv[i] = child.getGene(i) - current.getGene(i);
-            }
-            mv.add(Temp_mv);
-            NI++;
-
             return child;
         } else {
             return current;
